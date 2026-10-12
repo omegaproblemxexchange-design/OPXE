@@ -1,32 +1,32 @@
 # OPXE — Omega ProblemX Exchange
 
-OPXE is a responsive marketplace built with Next.js. Clerk, Neon-compatible PostgreSQL, and Cloudinary integration foundations are in place for authentication, listings, and listing photos; most account activity, Head-console workflows, and digital-store behavior still use browser-local storage and are not production-ready. A Capacitor Android project has been generated, but no deploy URL, APK/AAB, or signing setup is available yet.
+OPXE is a responsive marketplace built with Next.js and is deployed as a non-commercial beta at [opxe-website.vercel.app](https://opxe-website.vercel.app). Clerk authentication, Neon PostgreSQL, and Cloudinary integration are configured. The Clerk sign-up/sign-in UI and proxy endpoints have been smoke-tested, and the public pages respond successfully; a real account-registration flow still needs a user-run email verification test. Most account activity, Head-console workflows, and digital-store behavior still use browser-local storage and are not production-ready. A Capacitor Android project has been generated, but no APK/AAB or signing setup is available yet.
 
 The website calls the privileged administrator account the **Head**. The underlying app uses the technical `admin` role and `/admin` route; those implementation identifiers are unchanged. Payments and courier fulfillment remain manual via WhatsApp.
 
-**Not live yet:** deployment/provider accounts and secrets, database migrations, end-to-end testing with real provider test accounts, remaining workflow migrations, production legal/privacy review, Android HTTPS site URL, Android SDK/signing keys, and Play Console submission are outstanding. Do not use this build to process real payments or store sensitive customer information.
+**Beta limitations:** full authenticated end-to-end testing, remaining workflow migrations, production legal/privacy review, Android SDK/signing keys, and Play Console submission are outstanding. Do not use this build to process real payments or store sensitive customer information.
 
 ## Current launch status
 
 | Surface | Current implementation | What is still required |
 | --- | --- | --- |
-| Website | Next.js app; production build and lint pass locally. | Deploy to Vercel, configure a production domain and secrets, then test a staging deployment. |
-| Authentication | Clerk UI and server identity synchronization; configure a verified Clerk instance and `OPXE_HEAD_EMAIL` before enabling it. | Supply Clerk keys in local/deployment secret settings and test login, registration, redirects, and Head authorization. |
-| Listings | Homepage/marketplace reads and new listing creation use PostgreSQL APIs; listing images use signed Cloudinary uploads. | Create Neon DB, apply SQL migrations, configure Cloudinary, and test approval/moderation against the DB. |
+| Website | Live non-commercial beta at [opxe-website.vercel.app](https://opxe-website.vercel.app); production build passes and all public pages returned HTTP 200 in a smoke test. | Test on real mobile devices and complete authenticated end-to-end workflows. |
+| Authentication | Clerk production instance and Vercel proxy are configured; sign-up/sign-in widgets and Clerk proxy endpoints load successfully. | Complete a real sign-up with email verification, then verify login, redirects, and Head authorization. |
+| Listings | Homepage/marketplace reads and new listing creation use PostgreSQL APIs; production Neon database is migrated and Cloudinary is configured for signed uploads. | Test authenticated listing creation, uploads, approval, and moderation against production services. |
 | Remaining data | Dashboard, saved items, profile editing UI, requests, notifications, delivery, disputes/payments, digital products, and most Head controls remain local prototype flows. | Migrate these workflows to authenticated server APIs before production use; do not treat their local data as shared/live. |
 | Android | Capacitor project generated under `android/`; its bundled page is a setup placeholder until a hosted HTTPS URL is set. No APK or AAB exists. | Set `CAPACITOR_SERVER_URL` to the deployed HTTPS site, sync, test with Android tooling, and sign with a user-controlled release keystore. |
 | Transactions | No payment or courier provider is connected. | Continue manual WhatsApp coordination only until service providers are selected and integrated. |
 
-### Provider setup before staging
+### Provider setup and deployment
 
 1. Create a Neon PostgreSQL database and set `DATABASE_URL` in an ignored `.env.local` file for development and in the Vercel project secrets for deployment.
-2. Run `npm run db:migrate` to apply `database/migrations/0001_initial.sql` and `database/migrations/0002_cloudinary_image_urls.sql` in order. These migrations have not been applied or tested against a live database.
-3. Create a Clerk application, configure the production domain and allowed redirect URLs, then set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, and the verified `OPXE_HEAD_EMAIL`. Never put server secrets in browser code.
+2. Run `npm run db:migrate` to apply `database/migrations/0001_initial.sql` and `database/migrations/0002_cloudinary_image_urls.sql` in order. These migrations have been applied to the production Neon database.
+3. Create a Clerk application, configure the production domain and allowed redirect URLs, then set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, and the verified `OPXE_HEAD_EMAIL`. For the Vercel `vercel.app` domain, Clerk uses the `/__clerk` proxy, which is wired through `ClerkProviderBoundary` and the middleware matcher. Never put server secrets in browser code.
 4. Create a Cloudinary account and set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` as server-side secrets.
 5. Set `NEXT_PUBLIC_APP_URL` to the deployed HTTPS URL, deploy to Vercel, and test the web/API flows with provider test accounts and non-production data.
 6. Only after a stable HTTPS site exists, set `CAPACITOR_SERVER_URL` to that exact URL and generate/test the Android project. Keep release signing keys private and backed up.
 
-No provider credentials were supplied for this setup, so migrations, deployment, provider authentication, and APK signing have not been performed.
+Provider secrets are stored in deployment settings and are not committed to this repository. Android SDK setup, release signing, and Play Console submission have not been performed.
 
 The migration runner records each applied file and checksum in `public._opxe_schema_migrations`, serializes concurrent runs with a PostgreSQL advisory lock, and applies each file in a transaction. Applied migration files must not be edited; add a new numbered SQL migration for later schema changes.
 
