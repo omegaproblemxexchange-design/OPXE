@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { AuthenticationConfigurationError, getCurrentDatabaseUser, hasSameOrigin } from '@/lib/server/auth';
-import { withDatabaseTransaction } from '@/lib/server/db';
+import { getDatabasePool, withDatabaseTransaction } from '@/lib/server/db';
 
 export const runtime = 'nodejs';
 
@@ -15,7 +15,54 @@ export async function GET() {
     if (user.accountStatus !== 'active') {
       return NextResponse.json({ error: 'This account is not active. Contact OPXE support.' }, { status: 403 });
     }
-    return NextResponse.json({ user });
+    const pool = getDatabasePool();
+    const [ownListings, savedListings, requests] = await Promise.all([
+      pool.query(
+        `SELECT listings.id, listings.owner_id, listings.title, listings.type, listings.city, listings.price,
+                listings.description, listings.condition, listings.availability, listings.category,
+                listings.status, listings.created_at, users.name AS seller,
+                COALESCE(array_agg(listing_images.secure_url ORDER BY listing_images.position)
+                  FILTER (WHERE listing_images.secure_url IS NOT NULL), '{}') AS images
+         FROM listings
+         JOIN users ON users.id = listings.owner_id
+         LEFT JOIN listing_images ON listing_images.listing_id = listings.id
+         WHERE listings.owner_id = $1
+         GROUP BY listings.id, users.name
+         ORDER BY listings.created_at DESC
+         LIMIT 100`,
+        [user.id],
+      ),
+      pool.query(
+        `SELECT listings.id, listings.owner_id, listings.title, listings.type, listings.city, listings.price,
+                listings.description, listings.condition, listings.availability, listings.category,
+                listings.status, listings.created_at, users.name AS seller,
+                COALESCE(array_agg(listing_images.secure_url ORDER BY listing_images.position)
+                  FILTER (WHERE listing_images.secure_url IS NOT NULL), '{}') AS images
+         FROM saved_listings
+         JOIN listings ON listings.id = saved_listings.listing_id
+         JOIN users ON users.id = listings.owner_id
+         LEFT JOIN listing_images ON listing_images.listing_id = listings.id
+         WHERE saved_listings.user_id = $1
+         GROUP BY listings.id, users.name
+         ORDER BY max(saved_listings.created_at) DESC
+         LIMIT 100`,
+        [user.id],
+      ),
+      pool.query(
+        `SELECT id, listing_id, listing_title_snapshot, status, created_at
+         FROM exchange_requests
+         WHERE requester_id = $1
+         ORDER BY created_at DESC
+         LIMIT 100`,
+        [user.id],
+      ),
+    ]);
+    return NextResponse.json({
+      user,
+      ownListings: ownListings.rows,
+      savedListings: savedListings.rows,
+      requests: requests.rows,
+    });
   } catch (error) {
     console.error('Unable to load the authenticated OPXE profile.', error);
     return NextResponse.json(
