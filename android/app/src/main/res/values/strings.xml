@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">OPXE</string>
+    <string name="title_activity_main">OPXE</string>
+    <string name="package_name">com.omegaproblemxexchange.opxe</string>
+    <string name="custom_url_scheme">com.omegaproblemxexchange.opxe</string>
+</resources>
