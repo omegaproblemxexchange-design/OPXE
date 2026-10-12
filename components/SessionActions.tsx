@@ -1,6 +1,6 @@
 'use client';
 
-import { SignInButton, SignedIn, SignedOut, UserButton, useUser } from '@clerk/nextjs';
+import { Show, SignInButton, UserButton, useUser } from '@clerk/nextjs';
 import Link from 'next/link';
 
 function SignedInActions() {
@@ -30,14 +30,14 @@ export default function SessionActions() {
 
   return (
     <>
-      <SignedIn><SignedInActions /></SignedIn>
-      <SignedOut>
+      <Show when="signed-in"><SignedInActions /></Show>
+      <Show when="signed-out">
         <SignInButton mode="redirect" forceRedirectUrl="/dashboard">
           <button type="button" className="rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:brightness-110">
             Login
           </button>
         </SignInButton>
-      </SignedOut>
+      </Show>
     </>
   );
 }
