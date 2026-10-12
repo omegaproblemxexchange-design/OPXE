@@ -7,5 +7,9 @@ const publishableKey = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default function ClerkProviderBoundary({ children }: { children: ReactNode }) {
   if (!publishableKey) return children;
-  return <ClerkProvider publishableKey={publishableKey}>{children}</ClerkProvider>;
+  return (
+    <ClerkProvider publishableKey={publishableKey} proxyUrl="/__clerk">
+      {children}
+    </ClerkProvider>
+  );
 }
