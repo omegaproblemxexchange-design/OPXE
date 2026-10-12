@@ -9,52 +9,11 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import ImagePreview from '@/components/ImagePreview';
-
-type ProfileUser = {
-  id: string;
-  name: string;
-  email: string;
-  city: string;
-  phone: string;
-  college: string;
-  course: string;
-  classYear: string;
-  role: 'user' | 'premium' | 'admin';
-  accountStatus: string;
-  profileReviewed: boolean;
-  emailVerified: boolean;
-  createdAt: string;
-};
-
-type ProfileListing = {
-  id: string;
-  title: string;
-  category: string;
-  type: string;
-  images: string[];
-  city: string;
-  price: string;
-  status: string;
-};
-
-type ProfileResponse = {
-  user: ProfileUser;
-  ownListings: ProfileListing[];
-  savedListings: ProfileListing[];
-  requests: Array<{ id: string; listing_id: string; listing_title_snapshot: string; status: string }>;
-};
-
-async function responseError(response: Response) {
-  const result = await response.json().catch(() => null) as { error?: string } | null;
-  return result?.error || 'Unable to update your profile.';
-}
+import { getAppStore, getCurrentUser, getRoleLabel, listingBelongsToUser, saveAppStore, setCurrentUser, toggleSavedListing, type AppListing, type AppUser } from '@/lib/appStore';
 
 export default function ProfilePage() {
-  const [user, setUser] = useState<ProfileUser | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [editing, setEditing] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [signedOut, setSignedOut] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [phone, setPhone] = useState('');
@@ -62,108 +21,88 @@ export default function ProfilePage() {
   const [course, setCourse] = useState('');
   const [classYear, setClassYear] = useState('');
   const [message, setMessage] = useState('');
-  const [savedListings, setSavedListings] = useState<ProfileListing[]>([]);
-  const [ownListings, setOwnListings] = useState<ProfileListing[]>([]);
+  const [savedListings, setSavedListings] = useState<AppListing[]>([]);
+  const [ownListings, setOwnListings] = useState<AppListing[]>([]);
   const [activity, setActivity] = useState<Array<{ id: string; title: string; value: string; href: string }>>([]);
-  const [errorMessage, setErrorMessage] = useState('');
 
-  const applyProfile = (result: ProfileResponse) => {
-    const currentUser = result.user;
-    setUser(currentUser);
-    setName(currentUser.name);
-    setCity(currentUser.city);
-    setPhone(currentUser.phone);
-    setCollege(currentUser.college);
-    setCourse(currentUser.course);
-    setClassYear(currentUser.classYear);
-    setOwnListings(result.ownListings);
-    setSavedListings(result.savedListings);
+  const loadActivity = (currentUser: AppUser) => {
+    const store = getAppStore();
+    const own = store.listings.filter((item) => listingBelongsToUser(item, currentUser));
+    const savedIds = store.savedListingIdsByUser[currentUser.email.toLowerCase()]
+      ?? Object.entries(store.savedListingIdsByUser).find(([email]) => email.toLowerCase() === currentUser.email.toLowerCase())?.[1]
+      ?? [];
+    const saved = savedIds
+      .map((id) => store.listings.find((item) => item.id === id))
+      .filter((item): item is AppListing => Boolean(item));
+    const requests = store.requests
+      .filter((item) => item.requesterEmail.toLowerCase() === currentUser.email.toLowerCase())
+      .map((item) => ({ id: item.id, title: item.listingTitle, value: `Request • ${item.status}`, href: '/dashboard' }));
+
+    setOwnListings(own);
+    setSavedListings(saved);
     setActivity([
-      ...result.ownListings.map((item) => ({ id: item.id, title: item.title, value: `Listing • ${item.status}`, href: `/listing/${encodeURIComponent(item.id)}` })),
-      ...result.requests.map((item) => ({ id: item.id, title: item.listing_title_snapshot, value: `Request • ${item.status}`, href: '/dashboard' })),
+      ...own.map((item) => ({ id: item.id, title: item.title, value: `Listing • ${item.status}`, href: `/listing/${encodeURIComponent(item.id)}` })),
+      ...requests,
     ].slice(0, 8));
   };
 
   useEffect(() => {
-    const controller = new AbortController();
-    fetch('/api/profile', { cache: 'no-store', signal: controller.signal })
-      .then(async (response) => {
-        if (response.status === 401) {
-          setSignedOut(true);
-          return;
-        }
-        if (!response.ok) throw new Error(await responseError(response));
-        applyProfile(await response.json() as ProfileResponse);
-      })
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        console.error('Unable to load OPXE profile.', error);
-        setErrorMessage(error instanceof Error ? error.message : 'Unable to load your profile.');
-      })
-      .finally(() => setLoading(false));
-    return () => controller.abort();
+    const currentUser = getCurrentUser();
+    setUser(currentUser);
+    setName(currentUser?.name ?? '');
+    setCity(currentUser?.city ?? '');
+    setPhone(currentUser?.phone ?? '');
+    setCollege(currentUser?.college ?? '');
+    setCourse(currentUser?.course ?? '');
+    setClassYear(currentUser?.classYear ?? '');
+    if (currentUser) loadActivity(currentUser);
   }, []);
 
-  const saveProfile = async () => {
+  const saveProfile = () => {
     if (!user) return;
     if (!name.trim() || !city.trim() || !phone.trim() || !college.trim() || !course.trim() || !classYear.trim()) {
       setMessage('Please complete your name, city, phone, college, course, and class/year.');
       return;
     }
-    setSaving(true);
-    setMessage('');
-    setErrorMessage('');
-    try {
-      const response = await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          city: city.trim(),
-          phone: phone.trim(),
-          college: college.trim(),
-          course: course.trim(),
-          classYear: classYear.trim(),
-        }),
-      });
-      if (!response.ok) throw new Error(await responseError(response));
-      const refreshed = await fetch('/api/profile', { cache: 'no-store' });
-      if (!refreshed.ok) throw new Error(await responseError(refreshed));
-      applyProfile(await refreshed.json() as ProfileResponse);
-      setEditing(false);
-      setMessage('Profile saved to your OPXE account.');
-    } catch (error) {
-      console.error('Unable to save OPXE profile.', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to save your profile.');
-    } finally {
-      setSaving(false);
-    }
+    const updatedUser = {
+      ...user,
+      name: name.trim(),
+      city: city.trim(),
+      phone: phone.trim(),
+      college: college.trim(),
+      course: course.trim(),
+      classYear: classYear.trim(),
+    };
+    const store = getAppStore();
+    saveAppStore({
+      ...store,
+      users: store.users.map((item) => item.email === user.email ? updatedUser : item),
+      listings: store.listings.map((item) => listingBelongsToUser(item, user) ? { ...item, seller: updatedUser.name } : item),
+    });
+    setCurrentUser(updatedUser);
+    setUser(updatedUser);
+    loadActivity(updatedUser);
+    setEditing(false);
+    setMessage('Profile saved on this device.');
   };
 
-  const removeSavedListing = async (listingId: string) => {
-    setErrorMessage('');
-    try {
-      const response = await fetch(`/api/listings/${encodeURIComponent(listingId)}/actions`, { method: 'DELETE' });
-      if (!response.ok) throw new Error(await responseError(response));
-      setSavedListings((current) => current.filter((listing) => listing.id !== listingId));
-      setMessage('Listing removed from your saved items.');
-    } catch (error) {
-      console.error('Unable to remove the saved OPXE listing.', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Unable to remove the saved listing.');
+  const removeSavedListing = (listingId: string) => {
+    const result = toggleSavedListing(listingId);
+    if (!result.ok) {
+      setMessage(result.error);
+      return;
     }
+    if (user) loadActivity(user);
+    setMessage('Listing removed from your saved items.');
   };
 
-  if (loading) {
-    return <main className="page-shell"><p className="rounded-3xl border border-slate-800 bg-slate-900/70 p-8 text-slate-300">Loading your profile…</p></main>;
-  }
-
-  if (signedOut || !user) {
+  if (!user) {
     return (
       <main className="page-shell">
         <div className="mx-auto max-w-xl rounded-3xl border border-slate-800 bg-slate-900/70 p-8 text-center">
           <h1 className="text-2xl font-black text-white">Sign in to view your profile</h1>
-          <p className="mt-2 text-slate-300">{errorMessage || 'Your profile and activity are available after you sign in.'}</p>
-          {signedOut && <Link href={`/login?next=${encodeURIComponent('/profile')}`} className="mt-5 inline-flex rounded-full bg-cyan-400 px-5 py-3 font-semibold text-slate-950">Sign in</Link>}
+          <p className="mt-2 text-slate-300">Your profile and activity are saved in this browser only.</p>
+          <Link href="/login" className="mt-5 inline-flex rounded-full bg-cyan-400 px-5 py-3 font-semibold text-slate-950">Sign in</Link>
         </div>
       </main>
     );
@@ -179,7 +118,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <div className="text-2xl font-black text-white">{user.name}</div>
-              <div className="text-sm text-slate-400">{user.email} • {user.role} • {user.profileReviewed ? 'Profile reviewed' : 'Profile not reviewed'}</div>
+              <div className="text-sm text-slate-400">{user.email} • {getRoleLabel(user.role)} • {user.verified ? 'Profile reviewed' : 'Profile not reviewed'}</div>
             </div>
           </div>
 
@@ -216,7 +155,7 @@ export default function ProfilePage() {
                 </label>
               </div>
               <div className="flex gap-3">
-                <button type="button" disabled={saving} onClick={saveProfile} className="flex-1 rounded-full bg-cyan-400 px-5 py-3 font-semibold text-slate-950 disabled:opacity-50">{saving ? 'Saving…' : 'Save profile'}</button>
+                <button type="button" onClick={saveProfile} className="flex-1 rounded-full bg-cyan-400 px-5 py-3 font-semibold text-slate-950">Save profile</button>
                 <button type="button" onClick={() => { setEditing(false); setName(user.name); setCity(user.city); setPhone(user.phone); setCollege(user.college); setCourse(user.course); setClassYear(user.classYear); setMessage(''); }} className="rounded-full border border-slate-700 px-5 py-3 text-white">Cancel</button>
               </div>
             </div>
@@ -224,23 +163,22 @@ export default function ProfilePage() {
             <>
               <div className="mt-6 space-y-3 text-sm text-slate-300">
                 <div><span className="text-slate-500">City:</span> {user.city}</div>
-                <div><span className="text-slate-500">Email:</span> {user.email} <span className="text-xs text-amber-300">({user.emailVerified ? 'verified' : 'not verified'})</span></div>
-                <div><span className="text-slate-500">Phone:</span> {user.phone || 'Not provided'} <span className="text-xs text-amber-300">(not verified)</span></div>
+                <div><span className="text-slate-500">Email:</span> {user.email} <span className="text-xs text-amber-300">({user.emailVerified ? 'verified' : 'not OTP-verified'})</span></div>
+                <div><span className="text-slate-500">Phone:</span> {user.phone || 'Not provided'} <span className="text-xs text-amber-300">({user.phoneVerified ? 'verified' : 'not OTP-verified'})</span></div>
                 <div><span className="text-slate-500">College / school:</span> {user.college || 'Not provided'}</div>
                 <div><span className="text-slate-500">Course / program:</span> {user.course || 'Not provided'}</div>
                 <div><span className="text-slate-500">Class / year:</span> {user.classYear || 'Not provided'}</div>
-                <div><span className="text-slate-500">Account role:</span> {user.role}</div>
-                <div><span className="text-slate-500">Account status:</span> {user.accountStatus}</div>
-                <div><span className="text-slate-500">Profile review:</span> {user.profileReviewed ? 'Reviewed' : 'Not reviewed'}</div>
+                <div><span className="text-slate-500">Account role:</span> {getRoleLabel(user.role)}</div>
+                <div><span className="text-slate-500">Account status:</span> {user.accountStatus ?? 'active'}</div>
+                <div><span className="text-slate-500">Profile review:</span> {user.verified ? 'Reviewed' : 'Not reviewed'}</div>
                 <div><span className="text-slate-500">Member since:</span> {new Date(user.createdAt).toLocaleString()}</div>
-                <p className="pt-2 text-xs text-slate-500">Phone ownership is not verified. No phone OTP service is connected.</p>
+                <p className="pt-2 text-xs text-slate-500">Email and phone ownership are not verified. An OTP service is not connected.</p>
               </div>
               <button type="button" onClick={() => setEditing(true)} className="mt-6 w-full rounded-full border border-cyan-400 bg-cyan-500/10 px-5 py-3 font-semibold text-cyan-300">
                 Edit profile
               </button>
             </>
           )}
-          {errorMessage && <p role="alert" className="mt-4 text-sm text-red-300">{errorMessage}</p>}
           {message && <p role="status" className="mt-4 text-sm text-cyan-200">{message}</p>}
         </div>
 

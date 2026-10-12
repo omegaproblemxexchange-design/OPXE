@@ -1,6 +1,6 @@
 # OPXE — Omega ProblemX Exchange
 
-OPXE is a responsive marketplace built with Next.js and deployed as a non-commercial beta at [opxe-website.vercel.app](https://opxe-website.vercel.app). Its source is in the [public GitHub repository](https://github.com/omegaproblemxexchange-design/OPXE), connected to the Vercel project `opxe-website`. Clerk production authentication, Neon PostgreSQL in Singapore, and Cloudinary are configured. The Clerk sign-up/sign-in UI and `/__clerk` proxy endpoints have been smoke-tested. Profile, dashboard, saved-listing, exchange-request, notification, and delivery-request flows use database APIs; those authenticated flows still need a production account-based end-to-end test. Head-console workflows and digital-store catalog management retain prototype behavior. A Capacitor Android project has been generated, but no APK/AAB or signing setup is available yet.
+OPXE is a responsive marketplace built with Next.js and deployed as a non-commercial beta at [opxe-website.vercel.app](https://opxe-website.vercel.app). Its source is in the [public GitHub repository](https://github.com/omegaproblemxexchange-design/OPXE), connected to the Vercel project `opxe-website`. Clerk production authentication, Neon PostgreSQL in Singapore, and Cloudinary are configured. The Clerk sign-up/sign-in UI and `/__clerk` proxy endpoints have been smoke-tested, and public pages return successfully; a real account registration still needs a user-run email verification test. Most account activity, Head-console workflows, and digital-store behavior still use browser-local storage and are not production-ready. A Capacitor Android project has been generated, but no APK/AAB or signing setup is available yet.
 
 The website calls the privileged administrator account the **Head**. The underlying app uses the technical `admin` role and `/admin` route; those implementation identifiers are unchanged. Payments and courier fulfillment remain manual via WhatsApp.
 
@@ -10,12 +10,12 @@ The website calls the privileged administrator account the **Head**. The underly
 
 | Surface | Current implementation | What is still required |
 | --- | --- | --- |
-| Website | Non-commercial beta deployed through Vercel; local production build passes. | Verify the current production domain after deployment and complete authenticated end-to-end workflows. |
+| Website | Live non-commercial beta at [opxe-website.vercel.app](https://opxe-website.vercel.app); production build passes and all public pages returned HTTP 200 in a smoke test. | Test on real mobile devices and complete authenticated end-to-end workflows. |
 | Authentication | Clerk production instance and Vercel proxy are configured; sign-up/sign-in widgets and Clerk proxy endpoints load successfully. | Complete a real sign-up with email verification, then verify login, redirects, and Head authorization. |
 | Listings | Homepage/marketplace reads and new listing creation use PostgreSQL APIs; production Neon database is migrated and Cloudinary is configured for signed uploads. | Test authenticated listing creation, uploads, approval, and moderation against production services. |
-| Account workflows | Profile editing, dashboard listings/requests, saved items, exchange decisions, notifications, and delivery requests use authenticated database APIs. | Exercise these flows end-to-end against production services; migrate remaining Head and digital-product tools. |
+| Remaining data | Dashboard, saved items, profile editing UI, requests, notifications, delivery, disputes/payments, digital products, and most Head controls remain local prototype flows. | Migrate these workflows to authenticated server APIs before production use; do not treat their local data as shared/live. |
 | Android | Capacitor project generated under `android/`; no APK or AAB exists. | Set `CAPACITOR_SERVER_URL` to the live HTTPS site, sync, test with Android tooling, and sign with a user-controlled release keystore. |
-| Payments and delivery | No online payment processing or courier booking is planned; payments are coordinated manually by UPI/WhatsApp. | Make the manual-only status clear in the UI and verify request handling; do not add checkout or payment-provider dependencies. |
+| Transactions | No payment or courier provider is connected. | Continue manual WhatsApp coordination only until service providers are selected and integrated. |
 
 ### Provider setup and deployment
 
@@ -111,14 +111,14 @@ The interface uses a dark visual theme with listing/category shortcuts, horizont
 | Styling | Tailwind CSS 3, global rules in `app/globals.css` |
 | Routing | File-system routes under `app/` |
 | Initial content | No sample listings, payments, or disputes |
-| Current data | Public listings, listing creation/actions, profile, dashboard requests, notifications, and delivery requests use authenticated database APIs; Head console and digital-product workflows still need migration |
+| Current data | Mixed: homepage/marketplace and listing creation use APIs; many other workflows remain in `localStorage` |
 | Authentication | Clerk production UI and server identity integration; Clerk proxies through `/__clerk` on Vercel |
 | Database | Neon PostgreSQL production database with the current migrations applied; selected listing APIs use it |
 | Image storage | Signed Cloudinary listing upload integration; provider credentials are configured in Vercel |
 | Android | Capacitor configuration and Android project scaffold generated; no APK/AAB or release signing |
 | External services | Payments and courier booking are not connected; WhatsApp/manual handling only |
 
-Most interactive routes are client components (`'use client'`) rendered through Next.js App Router. Account-owned profile, dashboard, saved-listing, notification, exchange-request, and delivery-request data is loaded and changed through authenticated server APIs. The Head console and digital-product workflows still include prototype/browser-local behavior.
+Most interactive routes are client components (`'use client'`) rendered through Next.js App Router. Some features now call server APIs, but unsupported prototype workflows still use browser storage.
 
 ### Runtime commands
 
@@ -148,21 +148,21 @@ npm run lint
 | `/` | OPXE home page | Loads public approved listings and aggregate counts through server APIs when the database is configured. |
 | `/marketplace` | Marketplace feed | Loads approved/active listings from PostgreSQL; search, listing-type, story, city, and price filters run in the browser. |
 | `/digital-products` | OPXE Digital Store | Public catalog of available digital products, including product cover photos. Buyers provide an email and click Buy via WhatsApp to start an order with the product details and buyer email prefilled. Payment confirmation and download delivery must be handled manually; the app does not store downloadable product files, take payment, or automatically email downloads. |
-| `/listing/[id]` | Listing detail | Loads public listing data and Cloudinary photos through the database API. Signed-in users can send a request, save/unsave the listing, or submit a report through authenticated database APIs. Sent requests, saved items, and owner decisions are available in the database-backed dashboard/profile; Head report moderation UI remains prototype/local. |
+| `/listing/[id]` | Listing detail | Loads public listing data and Cloudinary photos through the database API. Signed-in users can send a request, save/unsave the listing, or submit a report through authenticated database APIs. The related dashboard, saved-items profile section, and Head report moderation UI still require migration before those records can be managed end-to-end. |
 | `/login` | Sign-in | Uses Clerk when configured; otherwise displays provider setup guidance. |
 | `/register` | Registration | Uses Clerk when configured; profile completion and redirect flows still require end-to-end verification. |
 | `/post` | Create listing | Requires an authenticated account and configured services; uploads 3–5 photos to Cloudinary and creates a pending PostgreSQL listing. |
-| `/dashboard` | Personal activity | Loads the signed-in user's listings, pending-approval count, sent requests, and incoming requests from PostgreSQL. Listing owners can accept or decline pending requests; the decision and requester notification are written transactionally. |
-| `/profile` | Profile and activity | Loads profile details, saved listings/photos, owned listings, and sent-request activity from PostgreSQL. Name/city/phone/education fields can be edited through the authenticated profile API; email and role cannot be edited here. Saved listings can be removed through the listing action API. Email verification comes from Clerk; phone is not verified. |
-| `/notifications` | Notification center | Requires sign-in. Loads notifications only for the signed-in account and stores read state in PostgreSQL. Supports mark-one and mark-all read. Exchange request creation and owner decisions generate durable notifications. Head messaging still needs migration; notifications are not real-time. |
+| `/dashboard` | Personal activity | Shows the signed-in user's listings, pending-approval count, sent requests, and incoming requests associated with owned listings. Listing owners can accept or decline incoming pending requests. Links open profile, marketplace, delivery, and, for the Head account, the Head console. |
+| `/profile` | Profile and activity | Displays account details, including name, email/phone and their OTP flags, city, education, account role/status (administrator appears as Head), review state, and member-since date. Name/city/phone/education fields can be edited and stored locally; email and role cannot be edited here. Saved listings appear in a dedicated section with links to view or remove each saved item, including its photo preview when available. Also shows up to eight own-listing/sent-request activity records. |
+| `/notifications` | Notification center | Requires sign-in. Shows private local notifications addressed to the signed-in account. New exchange requests notify the listing owner when the listing has a registered owner; accept/decline decisions notify the requester. Head messages use the same inbox. “Mark all read” changes visible records in browser storage. This is not server delivery or real-time messaging. |
 | `/ai` | Smart matching | Tokenizes the text into unique alphanumeric words longer than two characters and ranks approved local listings by the proportion of words present in each listing's text. This is deterministic browser keyword matching, not an AI service. A match card opens its listing. |
-| `/delivery` | Delivery estimate/request | Accepts positive distance up to and including 100 km and estimates `max(₹80, ₹40 + ₹12/km)`. Signed-in users can save a product, pickup/drop-off addresses, and courier preference in their account; these addresses are returned only to that account. Requests do not book a courier or charge payment. Above 100 km, the request form is replaced by support email, phone, and Help Centre links. |
+| `/delivery` | Delivery estimate/request | Accepts positive distance up to and including 100 km and estimates `max(₹80, ₹40 + ₹12/km)`. Signed-in users can enter a product, pickup/drop-off text addresses, and courier preference; a browser-local request is shown in this page and the Head console. It does not book a courier or charge payment. Above 100 km, the request form is replaced by support email, phone, and Help Centre links. |
 | `/admin` | Head control center | Not linked in public navigation. The client UI checks the current browser user's internal admin role (displayed as Head) and shows access denied otherwise. It has clickable metric drill-downs, user/listing/payment/dispute filters and moderation controls, local password change/reset, full browser-data backup/restore, request actions, local private notifications, delivery request details, CSV export, and a digital product manager. Direct route and client checks are not security controls. See [Head details](#head-control-center). |
 | `/help` | Help centre | Expandable, static guidance about listing, digital purchases, sending/responding to requests, delivery limit, account setup, and reports/disputes; OPXE support email and WhatsApp are listed. |
-| `/about` | About | Static description of OPXE and its current database-backed user flows and prototype limitations. |
+| `/about` | About | Static description of OPXE and its current browser-only storage limitation. |
 | `/contact` | Contact | Displays the OPXE sales/support email, WhatsApp number, and Bengaluru location; links open email or WhatsApp. |
 | `/terms` | Terms | Static informational disclaimer, not a legal agreement. |
-| `/privacy` | Privacy | Interim notice describing Clerk, PostgreSQL profile/request data, image hosting, and the beta's privacy limitations; it is not a reviewed privacy policy. |
+| `/privacy` | Privacy | Warns that browser profile data is accessible to users of that browser and the page is not a production privacy notice. |
 | `/cancellation` | Cancellation | Explains that the app processes no real payment, booking, refund, or cancellation. |
 | Not found | 404 | Next.js not-found experience with a route back to marketplace. |
 
@@ -204,23 +204,24 @@ The homepage's listing shortcuts, approved listing cards, category counts, and h
 - Buyers enter an email address (pre-filled from their local session when signed in). Buy via WhatsApp opens `https://wa.me/919515197745` with product ID/title/price, buyer email, and manual payment/delivery expectations in the message.
 - Sales and support email is `omegaproblemxexchange@gmail.com`; the sales contact number is +91 95151 97745.
 - Fulfillment must be handled manually: OPXE contacts the buyer in WhatsApp, verifies payment outside the app, then manually emails the digital download. The app does not contain or upload the downloadable file, accept payments, create a paid-order record, or send email/download links.
-- Digital products and role checks are browser-local prototype data, not protected server-side. A production store requires server authorization, persistent storage, protected file hosting with expiring access, and a transactional email service. Payments remain manual UPI/WhatsApp; no payment provider or webhook is required.
+- Digital products and role checks are browser-local prototype data, not protected server-side. A production store requires server authorization, persistent storage, payment-provider verification/webhooks, protected file hosting with expiring access, and a transactional email service.
 
 ### Exchange requests
 
 - A signed-in user can request another user's listing. The app blocks a request if the user is not signed in, the item is missing, the requester is the listing owner, or they already have an active request for the same item.
 - Requests are stored with listing ID/title, requester name/email, timestamp, and `Pending`/`Accepted`/`Declined` status.
 - The requester sees their sent request in their dashboard. The owner sees incoming requests in their dashboard and can accept or decline. The Head can also moderate requests from `/admin`.
-- Creating an exchange request writes a recipient-scoped database notification to the listing owner. Accept/decline from the owner dashboard writes a status notification to the requester in the same transaction. Older seed listings without a registered owner ID cannot receive owner notifications.
-- Request state is account-owned in PostgreSQL, but acceptance is not a payment or completed transaction. There is no messaging or email negotiation service.
-- Owner checks use the authenticated database owner ID; no seller-name fallback grants access.
+- Creating a request sends a recipient-scoped local notification to the registered owner of a newly created listing. Accept/decline from the owner dashboard or Head console sends a local status notification to the requester. Seed listings without a registered owner ID cannot receive an owner notification.
+- This is an in-browser workflow only: there is no messaging, email, negotiation service, or transaction record created from acceptance.
+- The owner check uses a stable `ownerId` for newly created listings. Legacy records without an owner ID continue to use a case-insensitive seller-name fallback, which cannot reliably distinguish two users who share a name.
 
 ### Saved items and reports
 
-- Save and remove operations use authenticated listing APIs and account-owned `saved_listings` rows.
+- Save toggles the listing ID in the local per-account `savedListingIdsByUser` collection.
+- The legacy single-account `savedListingIds` field is migrated to the active account when the per-account field is missing; current saves are keyed by normalized account email.
 - Report adds an open dispute record with the listing reference and a reason.
 - The dispute appears in the Head dispute center and can be marked resolved.
-- Saved-listing ownership is enforced in PostgreSQL. Head dispute visibility and management still need a server-backed console.
+- Account separation is only a browser UI behavior; there is no server-enforced ownership or cross-device synchronization. The notification center reads the same local notification store used by these actions.
 
 ### AI matching
 
@@ -231,10 +232,10 @@ The homepage's listing shortcuts, approved listing cards, category counts, and h
 
 ### Delivery request
 
-- The form validates the positive distance bound (the UI only exposes it through 100 km), product, pickup address, delivery address, and courier preference; the API enforces the same limits.
+- The form validates the positive distance bound (the UI only exposes it through 100 km), product, pickup address, delivery address, and courier preference. `lib/appStore.ts` also enforces the 100 km maximum before saving.
 - The fee is rounded up to a whole rupee after applying `max(80, 40 + 12 × distanceKm)`.
-- Requests are stored in PostgreSQL and visible only to the requesting account; they are marked as requested, not booked. Pickup/drop-off details are personal data.
-- No live address lookup, road-distance calculation, provider serviceability query, booking, tracking, courier status, payment, or cancellation exists. Above 100 km, support contact links are shown and no request can be submitted.
+- A successful record is marked `Request saved - courier not booked`; the signed-in user sees their own saved requests on `/delivery`, and the Head can see all local records in the delivery metric drill-down and CSV export.
+- No live address lookup, road-distance calculation, provider serviceability query, booking, tracking, courier status, payment, or cancellation exists. Above 100 km, support contact links are shown and no local request can be submitted.
 
 ## Head control center
 
@@ -333,12 +334,12 @@ The store is serialized in `localStorage` under `opxe_store_v1`; the current sig
 
 ## Database-backed features and remaining migration
 
-The app uses a **mixed persistence model**, not a fully database-backed marketplace. Production Neon PostgreSQL is configured, its migrations are applied, Clerk provides authentication, and listing/profile/dashboard/saved-item/exchange-request/notification/delivery APIs use authenticated server routes. Cloudinary handles signed listing image uploads. A server-only `pg` pool helper is in `lib/server/db.ts`. The Head console, digital products/orders, disputes/payments management, and some informational/demo surfaces still rely on browser-local prototype data; migrate these through authorized server APIs rather than adding database calls directly into React components.
+The app uses a **mixed persistence model**, not a fully database-backed marketplace. Production Neon PostgreSQL is configured, its initial migrations are applied, Clerk provides authentication, and selected listing/profile/API features use authenticated server routes. Cloudinary handles signed listing image uploads. A server-only `pg` pool helper is in `lib/server/db.ts`. Applying migrations alone does not make every workflow shared or secure: dashboard, saved items, notifications, delivery, disputes/payments, digital products, and many Head-console workflows still rely on browser-local prototype data. Continue migrating those flows to server-side repositories and authorized APIs rather than adding database calls directly into React components.
 
 ### 1. Production database setup already completed
 
 1. The production PostgreSQL database is Neon, hosted in Singapore. `DATABASE_URL` is configured as a Vercel secret and in the ignored local `.env.local`; the actual connection value must never be placed in this README or Git.
-2. The migration runner has applied `0001_initial.sql` and `0002_cloudinary_image_urls.sql` to production. The migrations define the schema but do not import legacy browser `localStorage` records.
+2. The migration runner has applied `0001_initial.sql` and `0002_cloudinary_image_urls.sql` to production. The migrations define the schema but do not import browser `localStorage` records.
 3. For future schema work, use a separate development database, add a new numbered migration, test it there, and plan production backup/rollout. Do not edit migrations that have already been applied.
 4. Continue building typed repositories under `lib/server/repositories/` on top of `lib/server/db.ts`. Neither the database client nor connection string may be imported into client components.
 5. Do not rely on browser data or the local Head account as production data.
@@ -372,26 +373,26 @@ Use `lib/appStore.ts` as the **migration reference**, not as the production data
 | Profile | `app/profile/page.tsx` | `/api/profile` GET/PATCH; validate fields, check uniqueness/ownership, record verification state from a real verification process. |
 | Browse/search listings | `app/marketplace/page.tsx`, `app/listing/[id]/page.tsx`, `app/ai/page.tsx`, `app/page.tsx` | Listing read/search routes; public responses must exclude private contact and moderation-only fields. Replace seed-only matching with approved database results. |
 | Create/moderate listings | `app/post/page.tsx`, `app/admin/page.tsx` | Create endpoint assigns owner from session (never submitted seller ID); admin-only approve/reject endpoint and audit log. |
-| Exchange requests/dashboard | `app/listing/[id]/page.tsx`, `app/dashboard/page.tsx` | Request creation and owner accept/decline use authenticated APIs and transactions; ownership and pending-state checks are server-side, and requesters are notified. |
-| Saved items and reports | `app/profile/page.tsx`, `app/listing/[id]/page.tsx`, `app/admin/page.tsx` | Saved-item reads and changes and listing reports use user-owned database records; moderation visibility in the Head console still needs migration. |
-| Notifications/admin messages | `app/notifications/page.tsx`, `app/admin/page.tsx` | Recipient-scoped list/read API and durable database notifications are active. Head messaging still needs a server endpoint that authorizes the sender and selects the recipient server-side; do not trust client-provided recipient email for access control. Add email/push delivery separately if wanted. |
-| Delivery | `app/delivery/page.tsx`, `app/help/page.tsx` | Authenticated delivery requests are stored in PostgreSQL, with server-side 100 km validation and estimated fee. Courier choices are preferences only, not active partners. Add serviceability/quote, confirmed booking, cancellations, tracking webhooks, retries, and delivery audit history only after choosing a provider. |
-| Payments/disputes/export | `app/admin/page.tsx`, `app/cancellation/page.tsx`, `app/privacy/page.tsx`, `app/terms/page.tsx` | Do not implement online checkout, payment-provider integrations, or webhooks; payments remain manual UPI/WhatsApp. Persist and authorize dispute reporting/resolution, Head access, and data exports on the server. Never trust browser-submitted payment status or totals. Review privacy, retention, cancellation, and payment terms before commercial use. |
+| Exchange requests/dashboard | `app/listing/[id]/page.tsx`, `app/dashboard/page.tsx`, `app/admin/page.tsx` | Request create/status endpoints; enforce owner/requester rules on the server and notify the correct parties. |
+| Saved items and reports | `app/listing/[id]/page.tsx`, `app/admin/page.tsx` | User-owned saved-listing endpoints and report/dispute endpoint; add server-side duplicate/rate/ownership checks. |
+| Notifications/admin messages | `app/notifications/page.tsx`, `app/admin/page.tsx`, `lib/notifications.ts` | Recipient-ID-scoped notification API and durable DB records. Admin messaging must authorize the sender and server-select the recipient; do not trust a client-provided recipient email for access control. Add email/push delivery separately if wanted. |
+| Delivery | `app/delivery/page.tsx`, `app/help/page.tsx`, `lib/appStore.ts` | `app/api/delivery/route.ts` (create), DB repository, and **create** `lib/delivery/providers/` adapter. Keep the 100 km rule enforced server-side; add serviceability/quote, confirmed booking, cancellations, tracking webhooks, retries, and delivery audit history. Courier options in the current UI are preferences only, not active partners. |
+| Payments/disputes/export | `app/admin/page.tsx`, `app/cancellation/page.tsx`, `app/privacy/page.tsx`, `app/terms/page.tsx` | Provider integration, verified webhooks, server-side payment ledger/refund/dispute transitions, admin authorization, and export endpoint with audit trail. Never trust browser-submitted payment status or totals. Review privacy, retention, cancellation, and payment terms before taking real customer data or money. |
 
-For remaining features, switch UI from `getAppStore()`/`saveAppStore()` or notification localStorage helpers to authenticated APIs only after the API, migration, authorization, and tests are in place. Keep presentation state local; keep ownership, status, money, and permissions authoritative on the server.
+For each feature, switch its UI from `getAppStore()`/`saveAppStore()` or notification localStorage helpers to its authenticated API only after the API, migration, authorization, and tests are in place. Keep presentation state local; keep ownership, status, money, and permissions authoritative on the server.
 
 ### 5. Move every page and admin action to server-owned data
 
 `app/admin/page.tsx` currently calculates totals, filters records, changes roles/listing/payment/dispute/request state, sends local notifications, and exports CSV in the browser. Replace each action with its own authenticated admin API; compute totals/filters from the database; audit role, moderation, payment, dispute, delivery, and export operations. Do not send the whole database or user passwords to the client. Update `app/dashboard/page.tsx` to query only the signed-in user's data.
 
-Notifications now derive the recipient from the server session and support durable read state. The client-side gates in `app/admin/page.tsx`, `components/SignInPrompt.tsx`, and `components/SessionActions.tsx` are UX only; every protected API must repeat authorization on the server.
+The current `app/notifications/page.tsx` filters local notification records in the browser. Production notification queries must derive the recipient from the server session, not accept arbitrary user IDs/emails. Likewise, the client-side gates in `app/admin/page.tsx`, `components/SignInPrompt.tsx`, and `components/SessionActions.tsx` are UX only; every protected API must repeat authorization on the server.
 
 ### 6. Add secrets, tests, and a safe rollout
 
 - Keep `.env.local` untracked. The repository `.gitignore` now ignores `.env` and `.env.*`, while explicitly allowing the blank `.env.example` template. Store real values only in `.env.local` and the deployment secret manager.
-- Add tests for migrations/repositories, unauthenticated and wrong-owner requests, non-admin access to every admin endpoint, profile privacy, notification recipient isolation, listing approval visibility, delivery at exactly 100 km versus above 100 km, and safe manual UPI/WhatsApp hand-off content. Payment-provider and webhook tests are out of scope unless online payments are explicitly added later.
+- Add tests for migrations/repositories, unauthenticated and wrong-owner requests, non-admin access to every admin endpoint, profile privacy, notification recipient isolation, listing approval visibility, delivery at exactly 100 km versus above 100 km, provider failure/webhook signature validation, and payment idempotency.
 - Use synthetic test data in a separate database. Never test with real user/customer/payment data in the current browser demo.
-- Back up production data, document restore/retention/deletion procedures, and deploy migrations with a rollback plan.
+- Back up production data, document restore/retention/deletion procedures, monitor provider failures, and deploy migrations with a rollback plan.
 - Keep the local version operable until the replacement API flow has passed tests; then remove obsolete localStorage writes so the app cannot accidentally present stale browser data as live database records.
 
 ## Head access
@@ -404,11 +405,11 @@ The site is live as a **non-commercial beta**, but the full marketplace is **not
 
 Other current limitations:
 
-- Online payments are not enabled or planned. Buyers and sellers coordinate payment manually via UPI/WhatsApp; the website does not collect payment credentials or provide in-app payment/refund processing.
+- No payment provider is connected. Payment and refund workflows are not ready to handle money.
 - Delivery fee is an estimate; local delivery requests and preferred courier selection do not book, track, insure, or fulfill a shipment. Distances above 100 km require contacting support.
 - User/listing “verification” is a local boolean or moderation status only, with no document or content-validation service.
-- Notifications, profile, saved items, dashboard activity, and delivery requests are stored per account in PostgreSQL, but are not real-time. The Head console and digital-product workflows still need full server-side migration.
-- Browsing and filtering public marketplace listings does not require sign-in; posting, requesting an exchange, saving, and reporting are account actions and require a signed-in session. Login and registration return to the intended action page where applicable.
+- Notifications and many account workflows are browser-local, not shared or real-time.
+- Browsing and filtering public marketplace listings does not require sign-in; posting, requesting an exchange, saving, and reporting are account actions and require a signed-in session. Login and registration return to the intended action page where applicable. Saved listing state is separated by account within the local store.
 - AI Match is local keyword overlap, not AI.
 - Static informational/legal copy needs product and legal review before launch.
 
@@ -416,12 +417,12 @@ Other current limitations:
 
 Before a real launch, finish and test the server-backed migration:
 
-1. Finish migrating remaining browser-local workflows (digital products/orders and Head-console actions) to authorized database-backed APIs; add appropriate pagination and end-to-end tests for the database-backed profile, dashboard, saved items, exchange requests, notifications, and delivery requests.
+1. Finish migrating browser-local workflows (dashboard, saved items, profile editing, exchange requests, notifications, delivery, digital products/orders, and Head-console actions) to authorized database-backed APIs.
 2. Move every privileged Head-console read/write action behind authorized server APIs, validate all input server-side, and audit administrative changes. Never let the browser promote a user to Head.
 3. Complete end-to-end tests for real sign-up/email verification, sign-in and redirects, listing ownership and moderation, image upload, and the selected database-backed actions.
 4. Add and test moderation evidence and an auditable verification process; keep user/listing verification from being represented as a trusted identity check until a real process exists.
-5. For delivery, keep current saved requests and estimates distinct from real bookings. No courier provider is connected; saved delivery requests are only requests for manual OPXE follow-up.
-6. Payments stay manual via UPI/WhatsApp. Do not add online checkout, a payment provider, payment webhooks, or in-app payment-status controls.
+5. For delivery, implement authorized route handlers in `app/api/delivery/route.ts`, persist requests through a server/database repository (replace the browser-only helper in `lib/appStore.ts`), and isolate provider code in `lib/delivery/providers/`. Handle quotes, booking confirmation/failure, cancellation, tracking webhooks, retries, and serviceability/100 km checks.
+6. Integrate a compliant payment provider; handle webhooks, refunds, disputes, and failure cases.
 7. Add rate limits, CSRF/origin protections where applicable, security logging, backups, privacy retention rules, and monitoring.
 8. Replace local counts/notifications with actual database aggregations and live event delivery.
 9. Add automated unit/integration/e2e tests for registration, listing approval, authorization, request transitions, reporting, and CSV exports.

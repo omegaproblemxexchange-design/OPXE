@@ -9,21 +9,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import SignInPrompt from '@/components/SignInPrompt';
-
-type DeliveryRequest = {
-  id: string;
-  product: string;
-  distance_km: number | string;
-  preferred_partner: string;
-  estimated_fee_inr: number;
-  status: string;
-  created_at: string;
-};
-
-async function responseError(response: Response) {
-  const result = await response.json().catch(() => null) as { error?: string } | null;
-  return result?.error || 'Unable to save the delivery request.';
-}
+import { createDeliveryRequest, getAppStore, getCurrentUser, type AppDeliveryRequest, type AppUser } from '@/lib/appStore';
 
 export default function DeliveryPage() {
   const [distance, setDistance] = useState('5');
@@ -31,10 +17,8 @@ export default function DeliveryPage() {
   const fee = Number.isFinite(numericDistance) && numericDistance > 0 && numericDistance <= 100
     ? Math.max(80, Math.ceil(numericDistance * 12 + 40))
     : null;
-  const [signedIn, setSignedIn] = useState(false);
-  const [requests, setRequests] = useState<DeliveryRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [requests, setRequests] = useState<AppDeliveryRequest[]>([]);
   const [product, setProduct] = useState('');
   const [pickupAddress, setPickupAddress] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
@@ -42,61 +26,35 @@ export default function DeliveryPage() {
   const [requestMessage, setRequestMessage] = useState('');
   const [requestError, setRequestError] = useState('');
 
-  const loadRequests = async (signal?: AbortSignal) => {
-    const response = await fetch('/api/delivery', { cache: 'no-store', signal });
-    if (response.status === 401) {
-      setSignedIn(false);
-      setRequests([]);
-      return;
-    }
-    if (!response.ok) throw new Error(await responseError(response));
-    const result = await response.json() as { requests: DeliveryRequest[] };
-    setSignedIn(true);
-    setRequests(result.requests);
-  };
-
   useEffect(() => {
-    const controller = new AbortController();
-    loadRequests(controller.signal)
-      .catch((error: unknown) => {
-        if (error instanceof Error && error.name === 'AbortError') return;
-        console.error('Unable to load OPXE delivery requests.', error);
-        setRequestError(error instanceof Error ? error.message : 'Unable to load delivery requests.');
-      })
-      .finally(() => setLoading(false));
-    return () => controller.abort();
+    const currentUser = getCurrentUser();
+    setUser(currentUser);
+    if (currentUser) {
+      setRequests(getAppStore().deliveryRequests.filter((request) => request.userEmail === currentUser.email));
+    }
   }, []);
 
-  const submitDeliveryRequest = async (event: React.FormEvent<HTMLFormElement>) => {
+  const submitDeliveryRequest = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setRequestError('');
     setRequestMessage('');
-    setSaving(true);
-    try {
-      const response = await fetch('/api/delivery', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          product,
-          pickupAddress,
-          deliveryAddress,
-          distanceKm: numericDistance,
-          preferredPartner,
-        }),
-      });
-      if (!response.ok) throw new Error(await responseError(response));
-      const result = await response.json() as { request: DeliveryRequest };
-      setRequests((current) => [result.request, ...current]);
-      setProduct('');
-      setPickupAddress('');
-      setDeliveryAddress('');
-      setRequestMessage(`Request ${result.request.id} saved to your account. Estimated fee: ₹${Number(result.request.estimated_fee_inr).toLocaleString('en-IN')}. No courier has been booked.`);
-    } catch (error) {
-      console.error('Unable to save OPXE delivery request.', error);
-      setRequestError(error instanceof Error ? error.message : 'Unable to save the delivery request.');
-    } finally {
-      setSaving(false);
+    const result = createDeliveryRequest({
+      product,
+      pickupAddress,
+      deliveryAddress,
+      distanceKm: numericDistance,
+      preferredPartner,
+    });
+    if (!result.ok) {
+      setRequestError(result.error);
+      return;
     }
+
+    setRequests((current) => [result.request, ...current]);
+    setProduct('');
+    setPickupAddress('');
+    setDeliveryAddress('');
+    setRequestMessage(`Request ${result.request.id} saved. Estimated fee: ₹${result.request.estimatedFee.toLocaleString('en-IN')}. No courier has been booked.`);
   };
 
   return (
@@ -139,9 +97,9 @@ export default function DeliveryPage() {
             <div className="space-y-4 rounded-3xl border border-slate-800 bg-slate-950/60 p-6">
               <div>
                 <div className="text-lg font-bold text-white">Request a pickup and delivery</div>
-                <p className="mt-2 text-sm text-slate-400">Choose a courier preference. Until a provider API is connected, this saves a request for OPXE follow-up only.</p>
+                <p className="mt-2 text-sm text-slate-400">Choose a courier preference. Until a provider API is connected, this only saves a request in this browser.</p>
               </div>
-              {!signedIn ? (
+              {!user ? (
                 <SignInPrompt next="/delivery" title="Sign in to request delivery" description="A signed-in account is required to save a pickup and delivery request." />
               ) : (
                 <form onSubmit={submitDeliveryRequest} className="space-y-4">
@@ -166,18 +124,18 @@ export default function DeliveryPage() {
                       <option>Shiprocket</option>
                     </select>
                   </label>
-                  <button type="submit" disabled={saving || loading} className="w-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-5 py-3 font-semibold text-slate-950 disabled:cursor-wait disabled:opacity-60">{saving ? 'Saving…' : 'Save delivery request'}</button>
+                  <button type="submit" className="w-full rounded-full bg-gradient-to-r from-cyan-400 to-blue-500 px-5 py-3 font-semibold text-slate-950">Save delivery request</button>
                 </form>
               )}
               {requestError && <p role="alert" className="text-sm text-red-300">{requestError}</p>}
               {requestMessage && <p role="status" className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-amber-100">{requestMessage}</p>}
               {requests.length > 0 && (
                 <div className="space-y-3 border-t border-slate-800 pt-4">
-                  <h2 className="font-semibold text-white">Your delivery requests</h2>
+                  <h2 className="font-semibold text-white">Your delivery requests on this device</h2>
                   {requests.map((request) => (
                     <article key={request.id} className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 text-sm">
-                      <div className="font-medium text-white">{request.product} · {Number(request.distance_km).toLocaleString('en-IN')} km · ₹{Number(request.estimated_fee_inr).toLocaleString('en-IN')}</div>
-                      <div className="mt-1 capitalize text-slate-400">{request.preferred_partner} preference · {request.status}</div>
+                      <div className="font-medium text-white">{request.product} · {request.distanceKm} km · ₹{request.estimatedFee.toLocaleString('en-IN')}</div>
+                      <div className="mt-1 text-slate-400">{request.preferredPartner} preference · {request.status}</div>
                     </article>
                   ))}
                 </div>
