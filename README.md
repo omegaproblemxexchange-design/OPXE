@@ -1,6 +1,6 @@
 # OPXE — Omega ProblemX Exchange
 
-OPXE is a responsive marketplace built with Next.js and is deployed as a non-commercial beta at [opxe-website.vercel.app](https://opxe-website.vercel.app). Clerk authentication, Neon PostgreSQL, and Cloudinary integration are configured. The Clerk sign-up/sign-in UI and proxy endpoints have been smoke-tested, and the public pages respond successfully; a real account-registration flow still needs a user-run email verification test. Most account activity, Head-console workflows, and digital-store behavior still use browser-local storage and are not production-ready. A Capacitor Android project has been generated, but no APK/AAB or signing setup is available yet.
+OPXE is a responsive marketplace built with Next.js and deployed as a non-commercial beta at [opxe-website.vercel.app](https://opxe-website.vercel.app). Its source is in the [public GitHub repository](https://github.com/omegaproblemxexchange-design/OPXE), connected to the Vercel project `opxe-website`. Clerk production authentication, Neon PostgreSQL in Singapore, and Cloudinary are configured. The Clerk sign-up/sign-in UI and `/__clerk` proxy endpoints have been smoke-tested, and public pages return successfully; a real account registration still needs a user-run email verification test. Most account activity, Head-console workflows, and digital-store behavior still use browser-local storage and are not production-ready. A Capacitor Android project has been generated, but no APK/AAB or signing setup is available yet.
 
 The website calls the privileged administrator account the **Head**. The underlying app uses the technical `admin` role and `/admin` route; those implementation identifiers are unchanged. Payments and courier fulfillment remain manual via WhatsApp.
 
@@ -14,17 +14,60 @@ The website calls the privileged administrator account the **Head**. The underly
 | Authentication | Clerk production instance and Vercel proxy are configured; sign-up/sign-in widgets and Clerk proxy endpoints load successfully. | Complete a real sign-up with email verification, then verify login, redirects, and Head authorization. |
 | Listings | Homepage/marketplace reads and new listing creation use PostgreSQL APIs; production Neon database is migrated and Cloudinary is configured for signed uploads. | Test authenticated listing creation, uploads, approval, and moderation against production services. |
 | Remaining data | Dashboard, saved items, profile editing UI, requests, notifications, delivery, disputes/payments, digital products, and most Head controls remain local prototype flows. | Migrate these workflows to authenticated server APIs before production use; do not treat their local data as shared/live. |
-| Android | Capacitor project generated under `android/`; its bundled page is a setup placeholder until a hosted HTTPS URL is set. No APK or AAB exists. | Set `CAPACITOR_SERVER_URL` to the deployed HTTPS site, sync, test with Android tooling, and sign with a user-controlled release keystore. |
+| Android | Capacitor project generated under `android/`; no APK or AAB exists. | Set `CAPACITOR_SERVER_URL` to the live HTTPS site, sync, test with Android tooling, and sign with a user-controlled release keystore. |
 | Transactions | No payment or courier provider is connected. | Continue manual WhatsApp coordination only until service providers are selected and integrated. |
 
 ### Provider setup and deployment
 
-1. Create a Neon PostgreSQL database and set `DATABASE_URL` in an ignored `.env.local` file for development and in the Vercel project secrets for deployment.
-2. Run `npm run db:migrate` to apply `database/migrations/0001_initial.sql` and `database/migrations/0002_cloudinary_image_urls.sql` in order. These migrations have been applied to the production Neon database.
-3. Create a Clerk application, configure the production domain and allowed redirect URLs, then set `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`, and the verified `OPXE_HEAD_EMAIL`. For the Vercel `vercel.app` domain, Clerk uses the `/__clerk` proxy, which is wired through `ClerkProviderBoundary` and the middleware matcher. Never put server secrets in browser code.
-4. Create a Cloudinary account and set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and `CLOUDINARY_API_SECRET` as server-side secrets.
-5. Set `NEXT_PUBLIC_APP_URL` to the deployed HTTPS URL, deploy to Vercel, and test the web/API flows with provider test accounts and non-production data.
-6. Only after a stable HTTPS site exists, set `CAPACITOR_SERVER_URL` to that exact URL and generate/test the Android project. Keep release signing keys private and backed up.
+The initial deployment is already configured:
+
+- **GitHub:** `omegaproblemxexchange-design/OPXE`, `main` branch.
+- **Vercel:** project `opxe-website`; the latest app-code deployment verified in this setup is commit `62d6aae`. Pushes to `main` are intended for production deployments; check the Deployments page after each push.
+- **Database:** Neon production project in Singapore. The migrations `0001_initial.sql` and `0002_cloudinary_image_urls.sql` have been applied.
+- **Authentication:** Clerk production instance. The production Vercel domain uses Clerk's `/__clerk` proxy, wired through `components/ClerkProviderBoundary.tsx` and `middleware.ts`.
+- **Images:** Cloudinary credentials are configured as server-side Vercel environment variables.
+- **Application:** `NEXT_PUBLIC_APP_URL` is set to the live HTTPS website URL.
+
+The launch setup also removed the seeded demo Head credentials, added server-backed listing save/request/report actions, added the PostgreSQL migration runner and schema, and prepared the Capacitor Android scaffold. Clerk's Core 3 sign-in component incompatibility was fixed, then the production `/__clerk` proxy route was added after the live sign-up form failed to load Clerk. The corrected production sign-up and sign-in widgets and their Clerk proxy requests were verified in the browser. Public routes and APIs were smoke-tested. This does not mean a real email verification or every signed-in workflow has been end-to-end tested.
+
+The provider credentials live in Vercel's Environment Variables settings and in a local ignored `.env.local` where needed. Do not copy secrets into source files, chat, screenshots, or Git commits. For local setup, use `.env.example` as a variable-name reference and obtain credentials directly from the provider dashboards. Never expose server credentials with a `NEXT_PUBLIC_` prefix.
+
+For a new database schema change, add a new numbered SQL migration; never edit an already-applied migration. Review the change, back up production data where appropriate, test on a development database first, then apply migrations deliberately. Do not run the production migration command casually as part of a routine website push.
+
+### Publishing future website changes
+
+The Vercel project is connected to the GitHub `main` branch. A successful push to `main` should create a production deployment; verify it in the Vercel project before assuming the change is live.
+
+1. Make and test the change locally. In PowerShell on Windows, use `npm.cmd` if the `npm` command is blocked by script execution policy:
+
+   ```powershell
+   npm.cmd run lint
+   npm.cmd run build
+   ```
+
+2. Review exactly what will be committed. Stage only the intended source/documentation files; do not use `git add .` blindly, and never stage `.env.local`, database URLs, API keys, or other secrets.
+
+   ```powershell
+   git status
+   git add path\to\changed-file.tsx
+   git diff --cached
+   git commit -m "Describe the change"
+   ```
+
+   For multiple intended files, give each path to `git add`. Check that `.env.local` is ignored and absent from the staged diff.
+
+3. Push the commit to the production branch:
+
+   ```powershell
+   git push origin main
+   ```
+
+4. Open the Vercel project **opxe-website → Deployments** and confirm the deployment for the new commit reaches **Ready**. Then open [opxe-website.vercel.app](https://opxe-website.vercel.app) and test the changed page or workflow.
+5. If no deployment appears, or the build fails, inspect the deployment status and logs in Vercel. Fix the reported issue and push another commit, or manually redeploy the intended latest `main` commit from Vercel. A successful Git push alone does not prove that the live deployment succeeded.
+
+Production environment variables are managed separately in Vercel and are not included in Git pushes. If a change requires a new secret or setting, add it to the correct Vercel environment and redeploy; never commit the value.
+
+The HTTPS website is live; the Android scaffold can use `https://opxe-website.vercel.app` as its site URL when Android development resumes. Android SDK setup, APK/AAB generation, release signing, and Play Console submission remain outstanding. Keep release signing keys private and backed up.
 
 Provider secrets are stored in deployment settings and are not committed to this repository. Android SDK setup, release signing, and Play Console submission have not been performed.
 
@@ -34,14 +77,14 @@ The migration runner records each applied file and checksum in `public._opxe_sch
 
 - [Product overview](#product-overview)
 - [Technology and architecture](#technology-and-architecture)
-- [Run locally](#run-locally)
+- [Runtime commands](#runtime-commands)
 - [Pages and routes](#pages-and-routes)
 - [How the main workflows work](#how-the-main-workflows-work)
 - [Head control center](#head-control-center)
 - [Data model and persistence](#data-model-and-persistence)
 - [Project file guide](#project-file-guide)
-- [Real database integration change map](#real-database-integration-change-map)
-- [Local Head access](#local-head-access)
+- [Database-backed features and remaining migration](#database-backed-features-and-remaining-migration)
+- [Head access](#head-access)
 - [Security, privacy, and production limitations](#security-privacy-and-production-limitations)
 - [Production work still required](#production-work-still-required)
 
@@ -69,10 +112,10 @@ The interface uses a dark visual theme with listing/category shortcuts, horizont
 | Routing | File-system routes under `app/` |
 | Initial content | No sample listings, payments, or disputes |
 | Current data | Mixed: homepage/marketplace and listing creation use APIs; many other workflows remain in `localStorage` |
-| Authentication | Clerk UI and server identity integration; inactive until Clerk environment variables are configured |
-| Database | PostgreSQL migrations and server routes exist; requires `DATABASE_URL` and has not been applied to a live database |
-| Image storage | Signed Cloudinary listing uploads; requires Cloudinary credentials |
-| Android | Capacitor configuration and Android project scaffold generated; no deploy URL, APK/AAB or release signing |
+| Authentication | Clerk production UI and server identity integration; Clerk proxies through `/__clerk` on Vercel |
+| Database | Neon PostgreSQL production database with the current migrations applied; selected listing APIs use it |
+| Image storage | Signed Cloudinary listing upload integration; provider credentials are configured in Vercel |
+| Android | Capacitor configuration and Android project scaffold generated; no APK/AAB or release signing |
 | External services | Payments and courier booking are not connected; WhatsApp/manual handling only |
 
 Most interactive routes are client components (`'use client'`) rendered through Next.js App Router. Some features now call server APIs, but unsupported prototype workflows still use browser storage.
@@ -220,7 +263,7 @@ The Head can change their own password after entering the current password, or s
 
 The full-data backup downloads the current browser's account and marketplace store plus notifications. Restore replaces current browser data and requires typing `RESTORE`. Passwords and active sessions are excluded; accounts already present in the destination browser keep their existing passwords, while accounts not present there must have their passwords reset by the Head. A backup contains personal profile, listing, and notification data; keep it private. This does not back up or change a PostgreSQL database.
 
-The Head cannot edit a database connection from this prototype because PostgreSQL is not connected. Once a server backend is implemented, database selection should use server-configured connection profiles; connection strings and credentials must not be exposed in client code or browser storage.
+The Head cannot change the production database connection from this prototype UI. The production Neon connection is configured in Vercel's server-side environment settings; changing it is an infrastructure operation, not a client-side setting. Never expose connection strings or credentials in client code or browser storage.
 
 The listings drill-down shows each listing's ID, title, owner label, type, category, price, condition, city, distance, availability, date, full description, moderation status, and approve/reject/public-view actions. Selecting approved, pending, or rejected listing cards narrows this detail view to that status. Request, dispute, payment, and disputed-payment metrics link to their full detail panels further down the Head console.
 
@@ -257,8 +300,8 @@ The store is serialized in `localStorage` under `opxe_store_v1`; the current sig
 | `app/marketplace/page.tsx` | Public listing discovery, local search and filters, listing cards. |
 | `app/digital-products/page.tsx` | Public digital catalog and WhatsApp purchase hand-off. |
 | `app/listing/[id]/page.tsx` | Listing details and request/save/report actions. |
-| `app/login/page.tsx` | Local sign-in form and role redirect. |
-| `app/register/page.tsx` | Local user registration and validation. |
+| `app/login/page.tsx` | Clerk sign-in widget and post-login redirect. |
+| `app/register/page.tsx` | Clerk sign-up widget and post-registration redirect. |
 | `app/post/page.tsx` | New listing form; creates pending listings. |
 | `app/dashboard/page.tsx` | Personal listings and sent/received request management. |
 | `app/profile/page.tsx` | Profile editing and personal activity. |
@@ -275,12 +318,13 @@ The store is serialized in `localStorage` under `opxe_store_v1`; the current sig
 | `app/privacy/page.tsx` | Privacy information page. |
 | `app/cancellation/page.tsx` | Cancellation information page. |
 | `app/not-found.tsx` | Not-found route experience. |
-| `components/SessionActions.tsx` | Header's browser-session-aware sign-in/profile/logout controls. |
+| `components/SessionActions.tsx` | Header sign-in/profile/logout controls backed by Clerk when configured. |
 | `components/SignInPrompt.tsx` | Shared account-required prompt with links back to the requested page after sign-in or registration. |
 | `lib/appStore.ts` | Types, initial state, browser persistence, registration/sign-in, listing and Head-only digital product create/remove, request/report/save, and delivery-request functions. |
 | `lib/notifications.ts` | Browser-local notification storage, record validation, and recipient notification helper. |
 | `lib/server/db.ts` | Server-only PostgreSQL connection pool and transaction helper; does not expose credentials to browser code. |
-| `database/migrations/0001_initial.sql` | PostgreSQL schema foundation for accounts/identities, listings/media, requests, digital items/orders, saved items, disputes, notifications, delivery, payments, and audit records; not yet applied or connected. |
+| `database/migrations/0001_initial.sql` | Initial PostgreSQL schema for accounts/identities, listings/media, requests, digital items/orders, saved items, disputes, notifications, delivery, payments, and audit records; applied to the production Neon database. |
+| `database/migrations/0002_cloudinary_image_urls.sql` | Adds Cloudinary image URL support; applied after the initial migration. |
 | `package.json` | Project scripts and dependency versions. |
 | `.env.example` | Documents the server-only PostgreSQL connection variable without credentials. |
 | `next.config.mjs` | Next.js configuration. |
@@ -288,23 +332,23 @@ The store is serialized in `localStorage` under `opxe_store_v1`; the current sig
 | `postcss.config.js` | PostCSS plugins used by the Tailwind build. |
 | `tsconfig.json` | TypeScript compiler configuration and import aliases. |
 
-## PostgreSQL and real database integration
+## Database-backed features and remaining migration
 
-The current app is **still browser-only**. PostgreSQL has been selected and an initial schema migration now exists at `database/migrations/0001_initial.sql`; a server-only `pg` pool helper is in `lib/server/db.ts`. The migration has not been run against a database, and no page or API reads or writes to it. There is no feature repository, secure authentication, or image-storage integration yet. Applying the migration alone will not make app data shared or secure. Replace browser persistence with server-side repositories and authorized APIs rather than adding database calls directly into React components.
+The app uses a **mixed persistence model**, not a fully database-backed marketplace. Production Neon PostgreSQL is configured, its initial migrations are applied, Clerk provides authentication, and selected listing/profile/API features use authenticated server routes. Cloudinary handles signed listing image uploads. A server-only `pg` pool helper is in `lib/server/db.ts`. Applying migrations alone does not make every workflow shared or secure: dashboard, saved items, notifications, delivery, disputes/payments, digital products, and many Head-console workflows still rely on browser-local prototype data. Continue migrating those flows to server-side repositories and authorized APIs rather than adding database calls directly into React components.
 
-### 1. Provision PostgreSQL and apply the initial migration
+### 1. Production database setup already completed
 
-1. Create separate PostgreSQL development and production databases. Use a supported PostgreSQL release with `gen_random_uuid()`.
-2. Set the server-only `DATABASE_URL` in ignored `.env.local` for local work and in the deployment secret manager for production. `.env.example` documents the variable name only. Never use `NEXT_PUBLIC_` for secrets or check in real connection strings.
-3. Review and apply `database/migrations/0001_initial.sql` to the development database using a PostgreSQL migration runner or `psql` configured with `ON_ERROR_STOP`. Back up existing data first; this migration defines the new schema but intentionally does not import browser `localStorage` records.
-4. Build typed repositories under `lib/server/repositories/` on top of `lib/server/db.ts`. Neither the database client nor connection string may be imported into client components.
-5. Add subsequent numbered migrations for every schema change. Do not rely on browser data or the local Head account as production data.
+1. The production PostgreSQL database is Neon, hosted in Singapore. `DATABASE_URL` is configured as a Vercel secret and in the ignored local `.env.local`; the actual connection value must never be placed in this README or Git.
+2. The migration runner has applied `0001_initial.sql` and `0002_cloudinary_image_urls.sql` to production. The migrations define the schema but do not import browser `localStorage` records.
+3. For future schema work, use a separate development database, add a new numbered migration, test it there, and plan production backup/rollout. Do not edit migrations that have already been applied.
+4. Continue building typed repositories under `lib/server/repositories/` on top of `lib/server/db.ts`. Neither the database client nor connection string may be imported into client components.
+5. Do not rely on browser data or the local Head account as production data.
 
 ### 2. Schema included in the initial migration
 
 The initial migration creates:
 
-- `users` and `auth_identities`: normalized unique account email, app role/status, profile/review flags, and a provider/subject mapping. Passwords and provider tokens are intentionally not stored in this app schema; the identity provider choice and integration are still outstanding.
+- `users` and `auth_identities`: normalized unique account email, app role/status, profile/review flags, and a provider/subject mapping. Clerk handles credentials; passwords and provider tokens are intentionally not stored in this app schema.
 - `listings` and `listing_images`: listing owner/moderation data plus image object keys and metadata. Image bytes belong in object storage, not PostgreSQL or browser local storage. Database triggers require at least three registered images for approved/active listings and prevent removing photos below that minimum.
 - `digital_products`, `digital_product_images`, `digital_product_assets`, and `digital_orders`: public product metadata/cover references, private downloadable-file references, and order/payment/fulfillment state. A WhatsApp hand-off is not proof of payment.
 - `exchange_requests`, `saved_listings`, `disputes`, `notifications`, and `delivery_requests`: account-owned workflows with relational IDs, state, timestamps, and indexes.
@@ -357,7 +401,7 @@ The production API grants the Head role only to the verified email configured as
 
 ## Security, privacy, and current limitations
 
-The app is **not production-ready**. Clerk-backed authentication and authorization-protected database endpoints exist for selected features, but many pages and Head-console actions still use local browser data and have not undergone live-provider or end-to-end security testing. Do not put real personal, identity, payment, dispute, or customer information into those prototype workflows. Every new feature must enforce identity, ownership, role, and input validation on the server.
+The site is live as a **non-commercial beta**, but the full marketplace is **not production-ready**. Clerk-backed authentication and authorization-protected database endpoints exist for selected features, but many pages and Head-console actions still use local browser data and have not undergone full live-provider or end-to-end security testing. Do not put real personal, identity, payment, dispute, or customer information into those prototype workflows. Every new feature must enforce identity, ownership, role, and input validation on the server.
 
 Other current limitations:
 
@@ -373,14 +417,14 @@ Other current limitations:
 
 Before a real launch, finish and test the server-backed migration:
 
-1. Choose a database and design durable user, listing, request, payment, dispute, and audit tables.
-2. Implement secure authentication, password hashing, session expiry/revocation, and server-side authorization.
-3. Give Head accounts controlled provisioning and role assignment; never let the browser promote itself.
-4. Move every privileged control-center read/write action behind authorized server APIs and validate all input server-side.
-5. Add image storage, moderation evidence, listing ownership rules, per-user saved items, and an auditable verification process.
-6. For delivery, implement authorized route handlers in `app/api/delivery/route.ts`, persist requests through a server/database repository (replace the browser-only helper in `lib/appStore.ts`), and isolate provider code in `lib/delivery/providers/`. Add provider secrets only to ignored `.env.local` for development and the deployment secret manager for production; never use `NEXT_PUBLIC_` credentials or commit them. Handle quotes, booking confirmation/failure, cancellation, tracking webhooks, retries, and serviceability/100 km checks.
-7. Integrate a compliant payment provider; handle webhooks, refunds, disputes, and failure cases.
-8. Add rate limits, CSRF/origin protections where applicable, security logging, backups, privacy retention rules, and monitoring.
-9. Replace local counts/notifications with actual database aggregations and live event delivery.
-10. Add automated unit/integration/e2e tests for registration, listing approval, authorization, request transitions, reporting, and CSV exports.
-11. Review legal pages, privacy requirements, operational policies, accessibility, and deployment secrets before production.
+1. Finish migrating browser-local workflows (dashboard, saved items, profile editing, exchange requests, notifications, delivery, digital products/orders, and Head-console actions) to authorized database-backed APIs.
+2. Move every privileged Head-console read/write action behind authorized server APIs, validate all input server-side, and audit administrative changes. Never let the browser promote a user to Head.
+3. Complete end-to-end tests for real sign-up/email verification, sign-in and redirects, listing ownership and moderation, image upload, and the selected database-backed actions.
+4. Add and test moderation evidence and an auditable verification process; keep user/listing verification from being represented as a trusted identity check until a real process exists.
+5. For delivery, implement authorized route handlers in `app/api/delivery/route.ts`, persist requests through a server/database repository (replace the browser-only helper in `lib/appStore.ts`), and isolate provider code in `lib/delivery/providers/`. Handle quotes, booking confirmation/failure, cancellation, tracking webhooks, retries, and serviceability/100 km checks.
+6. Integrate a compliant payment provider; handle webhooks, refunds, disputes, and failure cases.
+7. Add rate limits, CSRF/origin protections where applicable, security logging, backups, privacy retention rules, and monitoring.
+8. Replace local counts/notifications with actual database aggregations and live event delivery.
+9. Add automated unit/integration/e2e tests for registration, listing approval, authorization, request transitions, reporting, and CSV exports.
+10. Review legal pages, privacy requirements, operational policies, accessibility, and deployment settings before a commercial production launch.
+11. Build and test the Android app with the Android SDK, create a release-signed APK/AAB, and submit it to Play Console if Android distribution is needed.
